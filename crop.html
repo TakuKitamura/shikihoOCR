@@ -1,0 +1,181 @@
+<!-- Operation check with chrome -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Check image coordinates</title>
+<script type="text/javascript">
+window.onload = () => {
+    const canvas = document.getElementById('drowing')
+    const context = canvas.getContext('2d')
+    let reacts = []
+    let marks = []
+    let reacts_pos = {
+        upper_left: {x:0, y:0},
+        upper_right: {x:0, y:0},
+        lower_left: {x:0, y:0},
+        lower_right: {x:0, y:0}
+    }
+    let reacts_pos_text = []
+    let coordinateText = ''
+
+    let zoomRate = 0
+
+    const onMouseDown = (e) => {
+        layerX = e.layerX * (1 / zoomRate)
+        layerY = e.layerY * (1 / zoomRate)
+        word_pos = {startX: layerX, startY: layerY}
+        _rectangle.startX = layerX
+        _rectangle.startY = layerY
+        canvas.addEventListener ("mousemove", onMouseMove, false)
+    }
+
+    const onMouseMove = (e) => {
+        draw()
+        layerX = e.layerX * (1 / zoomRate)
+        layerY = e.layerY * (1 / zoomRate)
+
+        _rectangle.endX = layerX - _rectangle.startX
+        _rectangle.endY = layerY - _rectangle.startY
+        context.lineWidth = 1
+        context.strokeStyle = "rgb(255, 0, 0)"
+        context.strokeRect (_rectangle.startX, _rectangle.startY, _rectangle.endX, _rectangle.endY)
+    }
+    const onMouseUp = (e) => {
+        layerX = e.layerX * (1 / zoomRate)
+        layerY = e.layerY * (1 / zoomRate)
+
+        const n1 = {x: _rectangle.startX, y:_rectangle.startY}
+        const n2 = {x:_rectangle.startX + _rectangle.endX, y: _rectangle.startY + _rectangle.endY}
+        const [xMin, xMax] = n1.x < n2.x ? [n1.x , n2.x] : [n2.x, n1.x]
+        const [yMin, yMax] = n1.y < n2.y ? [n1.y , n2.y] : [n2.y , n1.y]
+
+        reacts_pos = {upper_left: {x:xMin, y:yMin}, upper_right: {x:xMax, y:yMin}, lower_left: {x:xMin, y:yMax}, lower_right: {x:xMax, y:yMax}}
+
+        // coordinateText = `number: ${reacts.length+1}\n`
+        // coordinateText += `upper_left: (x, y) = (${Math.round(reacts_pos.upper_left.x)}, ${Math.round(reacts_pos.upper_left.y)})\n`
+        // coordinateText += `upper_right: (x, y) = (${Math.round(reacts_pos.upper_right.x)}, ${Math.round(reacts_pos.upper_right.y)})\n`
+        // coordinateText += `lower_right: (x, y) = (${Math.round(reacts_pos.lower_right.x)}, ${Math.round(reacts_pos.lower_right.y)})\n`
+        // coordinateText += `lower_left: (x, y) = (${Math.round(reacts_pos.lower_left.x)}, ${Math.round(reacts_pos.lower_left.y)})\n\n`
+
+        coordinateText =`
+# ${reacts.length+1}
+crop_img = org_img[${Math.round(yMin)}:${Math.round(yMax)}, ${Math.round(xMin)}:${Math.round(xMax)}]
+cv2.imwrite('{}_${reacts.length+1}.jpg'.format(file_name_num), crop_img)
+`
+
+        word_pos.endX = layerX
+        word_pos.endY = layerY
+
+        reacts.push(_rectangle)
+        draw()
+        _rectangle = createRect()
+        canvas.removeEventListener ("mousemove", onMouseMove, false)
+
+        const mark = document.getElementById('mark')
+        const markHTML =  `<span style="background-color: white; font-size: 2em; position: absolute; left: ${(word_pos.startX + word_pos.endX - (5 * (1/zoomRate))) / 2}px; top: ${(word_pos.startY + word_pos.endY - (20 * (1/zoomRate))) / 2}px;">${reacts.length}</span>`
+        marks.push(markHTML)
+        mark.innerHTML = marks.join('')
+
+        reacts_pos_text.push(coordinateText)
+
+        const coordinate = document.getElementById("coordinate")
+        coordinate.value = reacts_pos_text.join('')
+
+    }
+
+    const draw = () => {
+        context.drawImage(imageObj, 0, 0, canvas.width, canvas.height)
+        context.lineWidth = 1
+        context.strokeStyle = "rgb(255, 0, 0)"
+        reacts.forEach((rect) => {
+            context.strokeRect(rect.startX, rect.startY, rect.endX, rect.endY)
+        })
+    }
+
+    const onKeyUp = (e) => {
+        switch(e.key) {
+            case 'z':
+                reacts.pop()
+                marks.pop()
+                const mark = document.getElementById('mark')
+                mark.innerHTML = marks.join('')
+
+                reacts_pos_text.pop()
+                const coordinate = document.getElementById('coordinate')
+                coordinate.value = reacts_pos_text.join('')
+                break
+            default:
+                return
+        }
+        draw()
+    }
+
+    const createRect = () => {
+        return { startY:0, startX:0, endY:0, endX:0 }
+    }
+
+    let imageObj = new Image()
+        imageObj.onload = () => {
+            reacts = []
+            marks = []
+            const mark = document.getElementById('mark')
+            mark.innerHTML = ''
+
+            reacts_pos_text = []
+            const coordinate = document.getElementById('coordinate')
+            coordinate.value = ''
+            canvas.width = imageObj.width
+            canvas.height = imageObj.height
+            draw()
+            zoomRate = window.innerHeight / canvas.height
+            console.log(zoomRate)
+            document.body.style.zoom = zoomRate
+    }
+
+    imageObj.src = 'https://unsplash.com/photos/1VgfQdCuX-4/download?force=true'
+
+    const target = document.getElementById('target')
+        target.addEventListener('change', (e) => {
+        const file = e.target.files[0]
+        const reader = new FileReader()
+        reader.onload = (e) => {
+        const img = document.getElementById("myImage")
+        imageObj.src = e.target.result
+    },
+        reader.readAsDataURL(file)
+    }, false)
+
+
+    canvas.addEventListener("mousedown", onMouseDown, false)
+    canvas.addEventListener("mouseup" , onMouseUp , false)
+    window.addEventListener("keyup" , onKeyUp , false)
+
+    let _rectangle = createRect()
+    let word_pos = {startX: 0, startY:0, endX: 0, endY: 0}
+
+    
+}
+</script>
+    
+</head>
+<body style="margin: 0px">
+    <div>
+        <div class="main" style="float: left; margin-right: 1em;">
+            <canvas style="border: 2px solid black;" id="drowing" class="drowing" />
+        </div>
+        <div>
+            <textarea id="coordinate" cols="30" rows="20" ></textarea>
+        </div>
+        <div>
+            <input type="file" id="target" accept="image/*">
+        </div>
+        <div>
+            <p>Try dragging the image.</p>
+            <p>Z Key: Go back one step.</p>
+        </div>
+
+        <div id="mark" />
+    </div>
+</body>
+</html>
